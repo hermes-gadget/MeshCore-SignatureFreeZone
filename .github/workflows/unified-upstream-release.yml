@@ -202,6 +202,11 @@ jobs:
       needs.discover.outputs.already_built != 'true' &&
       (github.event_name != 'workflow_dispatch' || inputs.publish_release)
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ needs.discover.outputs.release_tag }}
+      RELEASE_NAME: Unified Companion Firmware ${{ needs.discover.outputs.version }}
+      TARGET_COMMITISH: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/download-artifact@v8
@@ -209,12 +214,118 @@ jobs:
           pattern: firmware-*
           path: release
           merge-multiple: true
+
+      # Create the draft release once, retrying on secondary rate limits. A
+      # missing GitHub release/tag is the primary failure mode we are fixing,
+      # so unlike the previous single action call this is idempotent: if the
+      # release already exists (e.g. a re-run after a partial upload) it is
+      # reused rather than failing the job.
       - name: Create draft unified release
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: ${{ needs.discover.outputs.release_tag }}
-          target_commitish: ${{ github.sha }}
-          name: Unified Companion Firmware ${{ needs.discover.outputs.version }}
-          draft: true
-          generate_release_notes: true
-          files: release/*
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_json=""
+          backoff=5
+          for attempt in 1 2 3 4 5; do
+            if release_json=$(gh api -X POST "repos/${GITHUB_REPOSITORY}/releases" \
+                 -f tag_name="${RELEASE_TAG}" \
+                 -f target_commitish="${TARGET_COMMITISH}" \
+                 -f name="${RELEASE_NAME}" \
+                 -F draft=true \
+                 -F generate_release_notes=true 2>/tmp/release-create.err); then
+              break
+            fi
+            if grep -qiE 'secondary rate limit|rate limit|HTTP 403|HTTP 429' /tmp/release-create.err; then
+              echo "Create hit a rate limit (attempt ${attempt}); backing off ${backoff}s" >&2
+              sleep "$backoff"
+              backoff=$(( backoff * 2 ))
+              continue
+            fi
+            # Most likely the draft release already exists from an earlier attempt.
+            if release_json=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" 2>/tmp/release-create.err); then
+              echo "Reusing existing release ${RELEASE_TAG}"
+              break
+            fi
+            echo "Unable to create or find release ${RELEASE_TAG}" >&2
+            cat /tmp/release-create.err >&2 || true
+            exit 1
+          done
+          if [ -z "${release_json}" ]; then
+            echo "Release creation for ${RELEASE_TAG} did not succeed after retries" >&2
+            exit 1
+          fi
+          release_id=$(printf '%s' "$release_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+          upload_url=$(printf '%s' "$release_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["upload_url"].split("{")[0])')
+          {
+            echo "release_id=${release_id}"
+            echo "upload_url=${upload_url}"
+          } >> "$GITHUB_ENV"
+          echo "Draft release ${RELEASE_TAG} ready (id ${release_id})"
+
+      # `files: release/*` used to make action-gh-release fire one API request
+      # per file in a single burst, which tripped GitHub's secondary rate limit
+      # (HTTP 403 / 429) partway through and failed the whole job. Upload the
+      # assets ourselves instead, with exponential backoff on rate-limit
+      # responses and a short pause between batches, so a transient limit only
+      # delays uploads instead of failing the release.
+      - name: Upload firmware assets with retry and backoff
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(release/*)
+          total=${#files[@]}
+          if [ "$total" -eq 0 ]; then
+            echo "No firmware assets were found under release/" >&2
+            exit 1
+          fi
+          echo "Uploading ${total} firmware assets to ${RELEASE_TAG}"
+
+          upload_one() {
+            local file="$1" name="$2" attempt=1 max=6 backoff=5 code resp
+            while :; do
+              resp="/tmp/upload-$$.json"
+              code=$(curl -sS -o "$resp" -w '%{http_code}' \
+                -X POST "${upload_url}?name=${name}" \
+                -H "Authorization: Bearer ${GH_TOKEN}" \
+                -H "Accept: application/vnd.github+json" \
+                -H "Content-Type: application/octet-stream" \
+                --data-binary "@${file}") || code="000"
+              if [ "$code" = "201" ] || [ "$code" = "200" ]; then
+                return 0
+              fi
+              # Idempotent re-run: the asset is already attached to this release.
+              if [ "$code" = "422" ] && grep -qi 'already_exists' "$resp"; then
+                return 0
+              fi
+              local retryable=false
+              case "$code" in
+                429) retryable=true ;;
+                403) grep -qiE 'secondary rate limit|rate limit' "$resp" && retryable=true ;;
+                000|5??) retryable=true ;;
+              esac
+              if [ "$retryable" = true ] && [ "$attempt" -lt "$max" ]; then
+                echo "  retrying ${name} (attempt ${attempt}/${max}, HTTP ${code}); sleeping ${backoff}s" >&2
+                sleep "$backoff"
+                backoff=$(( backoff * 2 ))
+                attempt=$(( attempt + 1 ))
+                continue
+              fi
+              echo "Upload failed for ${name} (HTTP ${code})" >&2
+              cat "$resp" >&2 || true
+              return 1
+            done
+          }
+
+          batch_size=25
+          pause_between_batches=3
+          uploaded=0
+          for file in "${files[@]}"; do
+            upload_one "$file" "$(basename "$file")"
+            uploaded=$(( uploaded + 1 ))
+            if (( uploaded % batch_size == 0 )); then
+              echo "Uploaded ${uploaded}/${total}; pausing ${pause_between_batches}s to stay under the rate limit"
+              sleep "$pause_between_batches"
+            fi
+          done
+          echo "Uploaded all ${uploaded}/${total} firmware assets to ${RELEASE_TAG}"
