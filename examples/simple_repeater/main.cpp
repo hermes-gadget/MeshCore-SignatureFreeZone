@@ -97,6 +97,10 @@ void setup() {
   Serial.print("Repeater ID: ");
   mesh::Utils::printHex(Serial, the_mesh.self_id.pub_key, PUB_KEY_SIZE); Serial.println();
 
+#ifdef SIGNATURE_FREE_ZONE
+  Serial.println("[SFZ] Signature-Free Zone firmware - MeshOS signed messages will NOT be relayed by this node.");
+#endif
+
   command[0] = 0;
 #ifdef ETHERNET_ENABLED
   ethernet_command[0] = 0;

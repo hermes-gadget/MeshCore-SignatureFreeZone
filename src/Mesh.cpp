@@ -1,6 +1,18 @@
 #include "Mesh.h"
 //#include <Arduino.h>
 
+#ifdef SIGNATURE_FREE_ZONE
+  #include <Arduino.h>
+  #include "helpers/SignatureFreeZone.h"
+
+  // SFZ (Signature-Free Zone): well-known public channel key, hash byte 0x11.
+  // Sniffed so signed messages are caught even on nodes with no channel config.
+  static const uint8_t sfz_public_channel_key[CIPHER_KEY_SIZE] = {
+    0x8b, 0x33, 0x87, 0xe9, 0xc5, 0xcd, 0xea, 0x6a, 0xc9, 0xe5, 0xed, 0xba, 0xa1, 0x15, 0xcd, 0x72
+  };
+  static uint32_t sfz_blocked_count = 0;
+#endif
+
 namespace mesh {
 
 void Mesh::begin() {
@@ -235,12 +247,30 @@ DispatcherAction Mesh::onRecvPacket(Packet* pkt) {
         // scan channels DB, for all matching hashes of 'channel_hash' (max 4 matches supported ATM)
         GroupChannel channels[4];
         int num = searchChannelsByHash(&channel_hash, channels, 4);
+#ifdef SIGNATURE_FREE_ZONE
+        // SFZ: also sniff the public channel (well-known key), so signed messages
+        // are caught even when this node has no channel keys configured.
+        if (num < 4 && channel_hash == 0x11) {   // 0x11 = sha256(public channel key)[0]
+          GroupChannel& pub = channels[num++];
+          memset(&pub, 0, sizeof(pub));
+          pub.hash[0] = 0x11;
+          memcpy(pub.secret, sfz_public_channel_key, CIPHER_KEY_SIZE);
+        }
+#endif
         // for each matching channel, try to decrypt data
         for (int j = 0; j < num; j++) {
           // decrypt, checking MAC is valid
           uint8_t data[MAX_PACKET_PAYLOAD];
           int len = Utils::MACThenDecrypt(channels[j].secret, data, macAndData, pkt->payload_len - i);
           if (len > 0) {  // success!
+#ifdef SIGNATURE_FREE_ZONE
+            if (pkt->getPayloadType() == PAYLOAD_TYPE_GRP_TXT && isSignedChannelMessage(data, len)) {
+              // SFZ: signatures go no further than this repeater
+              pkt->markDoNotRetransmit();
+              sfz_blocked_count++;
+              Serial.printf("[SFZ] signed message blocked - this repeater is a signature-free zone. (blocked: %u)\n", (unsigned)sfz_blocked_count);
+            }
+#endif
             onGroupDataRecv(pkt, pkt->getPayloadType(), channels[j], data, len);
             break;
           }
