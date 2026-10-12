@@ -1,0 +1,17 @@
+name: Build SFZ Firmwares
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'sfz-*'
+
+jobs:
+  build-sfz-firmwares:
+    uses: ./.github/workflows/firmware-builder.yml
+    with:
+      firmware_type: 'sfz'
+      release_title_prefix: 'SFZ Firmware'

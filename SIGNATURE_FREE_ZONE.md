@@ -1,8 +1,10 @@
 # Signature-Free Zone (SFZ) — a joke firmware
 
-A stock **MeshCore repeater firmware** (v1.17.1, Heltec V3) with one opinion:
+A stock **MeshCore repeater firmware** (v1.17.1 base) with one opinion:
 **it does not relay signed messages.** Built for laughs, October 2026, after the
-MeshOS "signed channel messages" feature landed on the UK mesh.
+MeshOS "signed channel messages" feature landed on the UK mesh. Ships for every
+repeater board upstream MeshCore supports — each stock `<Board>_repeater` env
+has an `_sfz` twin.
 
 ## What it does
 
@@ -19,9 +21,19 @@ MeshOS "signed channel messages" feature landed on the UK mesh.
 
 ## Build
 
+Every repeater board gets an `_sfz` twin of its stock repeater env:
+
     pio run -e Heltec_v3_repeater_sfz
 
-Output in `.pio/build/Heltec_v3_repeater_sfz/` (merged image via `merge-bin.py`).
+(or any other `<Board>_repeater_sfz` env). To build the whole set locally:
+
+    FIRMWARE_VERSION=v1.17.1-SFZ sh build.sh build-sfz-firmwares
+
+or run the **Build SFZ Firmwares** GitHub Actions workflow (manual dispatch, or
+push an `sfz-*` tag) which builds all SFZ targets and can attach them to a
+draft release.
+
+Output in `.pio/build/<env>/` (merged image via `merge-bin.py`).
 
 ## Flash
 
@@ -61,7 +73,8 @@ these boards).
 2. `src/Mesh.cpp` — `#ifdef SIGNATURE_FREE_ZONE` hook at the GRP_TXT decrypt
    site: sniff public channel + mark signed packets do-not-retransmit.
 3. `examples/simple_repeater/main.cpp` — boot banner line.
-4. `variants/heltec_v3/platformio.ini` — `[env:Heltec_v3_repeater_sfz]`
-   (extends the stock repeater env; adds `-D SIGNATURE_FREE_ZONE=1` and a
-   `-D FIRMWARE_VERSION` tag).
-5. `test/test_signature_free_zone/` — detector tests.
+4. `variants/*/platformio.ini` — an `[env:<Board>_repeater_sfz]` twin of every
+   repeater env (extends it and adds `-D SIGNATURE_FREE_ZONE=1`).
+5. `build.sh` + `.github/workflows/build-sfz-firmwares.yml` — build the whole
+   SFZ set locally (`build-sfz-firmwares`) or in CI.
+6. `test/test_signature_free_zone/` — detector tests.

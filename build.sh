@@ -17,6 +17,7 @@ Commands:
   build-companion-firmwares: Build all companion firmwares for all build targets.
   build-repeater-firmwares: Build all repeater firmwares for all build targets.
   build-room-server-firmwares: Build all chat room server firmwares for all build targets.
+  build-sfz-firmwares: Build all SFZ (signature-free zone) repeater firmwares for all repeater build targets.
 
 Examples:
 Build firmware for the "RAK_4631_repeater" device target
@@ -33,6 +34,9 @@ $ sh build.sh build-repeater-firmwares
 
 Build all chat room server firmwares
 $ sh build.sh build-room-server-firmwares
+
+Build all SFZ (signature-free zone) repeater firmwares
+$ sh build.sh build-sfz-firmwares
 
 Build all kiss radio firmwares
 $ sh build.sh build-kiss-radio-firmwares
@@ -256,6 +260,13 @@ build_kiss_modem_firmwares() {
 
 }
 
+build_sfz_firmwares() {
+
+  # build all signature-free zone (sfz) repeater firmwares
+  build_all_firmwares_by_suffix "_sfz"
+
+}
+
 build_firmwares() {
   build_companion_firmwares
   build_repeater_firmwares
@@ -294,6 +305,8 @@ elif [[ $1 == "build-room-server-firmwares" ]]; then
   build_room_server_firmwares
 elif [[ $1 == "build-kiss-radio-firmwares" ]]; then
   build_kiss_modem_firmwares
+elif [[ $1 == "build-sfz-firmwares" ]]; then
+  build_sfz_firmwares
 elif [[ $1 == "get-companion-firmwares-to-build" ]]; then
   get_pio_envs_ending_with_string "_companion_radio_usb"
   get_pio_envs_ending_with_string "_companion_radio_ble"
@@ -301,4 +314,6 @@ elif [[ $1 == "get-repeater-firmwares-to-build" ]]; then
   get_pio_envs_ending_with_string "_repeater"
 elif [[ $1 == "get-room-server-firmwares-to-build" ]]; then
   get_pio_envs_ending_with_string "_room_server"
+elif [[ $1 == "get-sfz-firmwares-to-build" ]]; then
+  get_pio_envs_ending_with_string "_sfz"
 fi
