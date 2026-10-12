@@ -20,7 +20,12 @@ MeshCore project or the MeshOS project.
 
     pio run -e Heltec_v3_repeater_sfz
 
-Merged image output lands in `.pio/build/Heltec_v3_repeater_sfz/` (via `merge-bin.py`).
+Every repeater board has an `_sfz` twin of its stock `<Board>_repeater` env (91
+targets). Build them all with `FIRMWARE_VERSION=<ver> sh build.sh build-sfz-firmwares`,
+or run the **Build SFZ Firmwares** GitHub Actions workflow to build the whole set
+and attach it to a draft release.
+
+Merged image output lands in `.pio/build/<env>/` (via `merge-bin.py`).
 
 ## Flash
 
