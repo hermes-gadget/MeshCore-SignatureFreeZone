@@ -70,20 +70,6 @@ The companion firmware can be connected to via BLE, USB or Wi-Fi depending on th
 - NodeJS: https://github.com/liamcottle/meshcore.js
 - Python: https://github.com/fdlamotte/meshcore-cli
 
-**Unified Firmware** 🚀
-
-The [Unified Firmware](examples/unified_radio/README.md) is a Companion variant that includes **BLE, WiFi, and USB/UART** in one build. Supported interfaces run together by default, including on headless devices.
-
-Key features:
-- Concurrent connections through every supported transport
-- Generated builds for all upstream companion device variants
-- Predictable `All` mode restored on every release-build reboot
-- WiFi access-point defaults that require no embedded credentials
-- Automatic builds when upstream publishes a companion release
-- Zero changes to core MeshCore source files — fully modular
-
-See the [Unified Firmware README](examples/unified_radio/README.md) for builds, configuration, and supported boards.
-
 **Repeater and Room Server Firmware**
 
 The repeater and room server firmware can be set up via USB in the web config tool.
