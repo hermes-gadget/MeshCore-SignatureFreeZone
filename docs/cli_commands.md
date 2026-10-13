@@ -654,7 +654,7 @@ This document provides an overview of CLI commands that can be sent to MeshCore 
 **Parameters:**
 - `hours`: Interval in hours (3-168)
 
-**Default:** `12` (Repeater) - `0` (Sensor)
+**Default:** `168` (Repeater, 7 days) - `0` (Sensor)
 
 ---
 
@@ -664,9 +664,9 @@ This document provides an overview of CLI commands that can be sent to MeshCore 
 - `set advert.interval <minutes>`
 
 **Parameters:**
-- `minutes`: Interval in minutes rounded down to the nearest multiple of 2 (61 becomes 60) (60-240)
+- `minutes`: Interval in minutes rounded down to the nearest multiple of 2 (61 becomes 60) (60-1440; 0 disables)
 
-**Default:** `0`
+**Default:** `1440` (Repeater, 24 hours) - `2` (Sensor)
 
 ---
 

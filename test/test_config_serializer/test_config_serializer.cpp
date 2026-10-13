@@ -215,6 +215,25 @@ TEST(NodePrefs, FemGainSettingsRoundTrip) {
 }
 
 
+TEST(NodePrefs, AdvertIntervalRoundTrip) {
+    NodePrefs saved;
+    saved.advert_interval = 720;        // 24 hours (minutes / 2)
+    saved.flood_advert_interval = 168;  // 7 days (hours)
+
+    MockPrintStream output;
+    ASSERT_TRUE(saved.saveSerial(output));
+
+    std::string serialised(reinterpret_cast<const char*>(output.getBytes()), output.getLength());
+    EXPECT_NE(std::string::npos, serialised.find("adv_int:720"));
+    EXPECT_NE(std::string::npos, serialised.find("f_adv_int:168"));
+
+    MockInputStream input(serialised.c_str());
+    NodePrefs loaded;
+    ASSERT_TRUE(loaded.loadSerial(input));
+    EXPECT_EQ(720, loaded.advert_interval);
+    EXPECT_EQ(168, loaded.flood_advert_interval);
+}
+
 // ── main ───────────────────────────────────────────────────────
 
 int main(int argc, char** argv) {
