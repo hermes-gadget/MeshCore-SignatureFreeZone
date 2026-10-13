@@ -9,6 +9,8 @@
 #define BRIDGE_MAX_BAUD 115200
 #endif
 
+#define MIN_LOCAL_ADVERT_INTERVAL   60
+
 // Believe it or not, this std C function is busted on some platforms!
 static uint32_t _atoi(const char* sp) {
   uint32_t n = 0;
@@ -37,6 +39,12 @@ void CommonCLI::loadPrefs(FILESYSTEM* fs) {
     if (file) {
       _prefs->loadSerial(file);   // new Serial prefs
       file.close();
+      // a persisted sub-minimum local advert interval can only be a leftover from
+      // an unclamped save of the new-install default; left alone, the node would
+      // keep advertising every 2 minutes indefinitely
+      if (_prefs->advert_interval * 2 < MIN_LOCAL_ADVERT_INTERVAL) {
+        _prefs->advert_interval = 0;
+      }
     }
   } else if (fs->exists("/com_prefs")) {
     loadPrefsInt(fs, "/com_prefs");
@@ -129,6 +137,9 @@ void CommonCLI::loadPrefsInt(FILESYSTEM* fs, const char* filename) {  // Legacy 
 
     _prefs->gps_enabled = constrain(_prefs->gps_enabled, 0, 1);
     _prefs->advert_loc_policy = constrain(_prefs->advert_loc_policy, 0, 2);
+    if (_prefs->advert_interval * 2 < MIN_LOCAL_ADVERT_INTERVAL) {
+      _prefs->advert_interval = 0;  // as in savePrefs(): sub-minimum values must not survive configuration
+    }
 
     // sanitise settings
     _prefs->rx_boosted_gain = constrain(_prefs->rx_boosted_gain, 0, 1); // boolean
@@ -156,8 +167,6 @@ bool CommonCLI::savePrefs(FILESYSTEM* fs) {
   }
   return false;
 }
-
-#define MIN_LOCAL_ADVERT_INTERVAL   60
 
 void CommonCLI::savePrefs() {
   if (_prefs->advert_interval * 2 < MIN_LOCAL_ADVERT_INTERVAL) {
@@ -598,7 +607,7 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
       _prefs->cr = cr;
       _prefs->freq = freq;
       _prefs->bw = bw;
-      _callbacks->savePrefs();
+      savePrefs();  // guarded save: also normalises a not-yet-configured advert interval
       strcpy(reply, "OK - reboot to apply");
     } else {
       strcpy(reply, "Error, invalid radio params");
