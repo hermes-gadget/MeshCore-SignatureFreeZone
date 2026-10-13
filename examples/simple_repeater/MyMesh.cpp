@@ -900,8 +900,8 @@ MyMesh::MyMesh(mesh::MainBoard &board, mesh::Radio &radio, mesh::MillisecondCloc
   _prefs.bw = LORA_BW;
   _prefs.cr = LORA_CR;
   _prefs.tx_power_dbm = LORA_TX_POWER;
-  _prefs.advert_interval = 1;        // default to 2 minutes for NEW installs
-  _prefs.flood_advert_interval = 47; // 47 hours
+  _prefs.advert_interval = 720;        // default to 24 hours (1440 minutes / 2) for NEW installs
+  _prefs.flood_advert_interval = 168;  // default to 7 days (168 hours) for NEW installs
   _prefs.flood_max = 64;
   _prefs.flood_max_unscoped = 64;
   _prefs.flood_max_advert = 8;

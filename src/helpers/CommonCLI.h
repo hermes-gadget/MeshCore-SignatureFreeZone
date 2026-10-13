@@ -30,7 +30,7 @@ public:
   float freq = 0;
   int8_t tx_power_dbm = 0;
   uint8_t disable_fwd = 0;
-  uint8_t advert_interval = 0;       // minutes / 2
+  uint16_t advert_interval = 0;      // minutes / 2
   uint8_t flood_advert_interval = 0; // hours
   float rx_delay_base = 0;
   float tx_delay_factor = 0;

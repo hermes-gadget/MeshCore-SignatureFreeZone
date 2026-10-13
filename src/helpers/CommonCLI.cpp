@@ -10,6 +10,7 @@
 #endif
 
 #define MIN_LOCAL_ADVERT_INTERVAL   60
+#define MAX_LOCAL_ADVERT_INTERVAL   1440   // minutes (24 hours)
 
 // Believe it or not, this std C function is busted on some platforms!
 static uint32_t _atoi(const char* sp) {
@@ -72,8 +73,7 @@ void CommonCLI::loadPrefsInt(FILESYSTEM* fs, const char* filename) {  // Legacy 
     file.read((uint8_t *)&_prefs->freq, sizeof(_prefs->freq));                        // 72
     file.read((uint8_t *)&_prefs->tx_power_dbm, sizeof(_prefs->tx_power_dbm));        // 76
     file.read((uint8_t *)&_prefs->disable_fwd, sizeof(_prefs->disable_fwd));          // 77
-    file.read((uint8_t *)&_prefs->advert_interval, sizeof(_prefs->advert_interval));  // 78
-    file.read(pad, 1);                                                                // 79 : 1 byte unused (was rx_boosted_gain in v1.14.1, moved to end for upgrade compat)
+    file.read((uint8_t *)&_prefs->advert_interval, sizeof(_prefs->advert_interval));  // 78-79 (uint16; the old 1-byte value + zero pad reads back unchanged)
     file.read((uint8_t *)&_prefs->rx_delay_base, sizeof(_prefs->rx_delay_base));      // 80
     file.read((uint8_t *)&_prefs->tx_delay_factor, sizeof(_prefs->tx_delay_factor));  // 84
     file.read((uint8_t *)&_prefs->guest_password[0], sizeof(_prefs->guest_password)); // 88
@@ -504,10 +504,10 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
     }
   } else if (memcmp(config, "advert.interval ", 16) == 0) {
     int mins = _atoi(&config[16]);
-    if ((mins > 0 && mins < MIN_LOCAL_ADVERT_INTERVAL) || (mins > 240)) {
-      sprintf(reply, "Error: interval range is %d-240 minutes", MIN_LOCAL_ADVERT_INTERVAL);
+    if ((mins > 0 && mins < MIN_LOCAL_ADVERT_INTERVAL) || (mins > MAX_LOCAL_ADVERT_INTERVAL)) {
+      sprintf(reply, "Error: interval range is %d-%d minutes", MIN_LOCAL_ADVERT_INTERVAL, MAX_LOCAL_ADVERT_INTERVAL);
     } else {
-      _prefs->advert_interval = (uint8_t)(mins / 2);
+      _prefs->advert_interval = (uint16_t)(mins / 2);
       _callbacks->updateAdvertTimer();
       savePrefs();
       strcpy(reply, "OK");
